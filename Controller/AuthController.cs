@@ -6,6 +6,8 @@ using OWMS.Models;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using BCrypt.Net;
+using OWMS.Requests;
 
 [Route("api/auth")]
 [ApiController]
@@ -23,10 +25,19 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password))
+        if (request == null || string.IsNullOrEmpty(request.Username) || string.IsNullOrEmpty(request.Password))
+
         {
-            return Unauthorized(new { message = "±b¸¹©Î±K½X¿ù»~¡I" });
+            return BadRequest(new { message = "ï¿½Ï¥ÎªÌ¦Wï¿½Ù©Mï¿½Kï¿½Xï¿½ï¿½ï¿½oï¿½ï¿½ï¿½Å¡I" });
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
+        if (user == null || string.IsNullOrEmpty(user.Password) || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password))
+
+        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password))
+
+        {
+            return Unauthorized(new { message = "ï¿½bï¿½ï¿½ï¿½Î±Kï¿½Xï¿½ï¿½ï¿½~ï¿½I" });
         }
 
         var token = GenerateJwtToken(user);
@@ -35,7 +46,17 @@ public class AuthController : ControllerBase
 
     private string GenerateJwtToken(User user)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JwtSettings:Key"]));
+        if (user == null)
+        {
+            throw new ArgumentNullException(nameof(user), "User cannot be null.");
+        }
+
+        var keyString = _config["JwtSettings:Key"];
+        if (string.IsNullOrEmpty(keyString))
+        {
+            throw new Exception("JWT ï¿½Kï¿½_ï¿½ï¿½ï¿½]ï¿½w");
+        }
+
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var claims = new[]
         {
@@ -54,10 +75,4 @@ public class AuthController : ControllerBase
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
-}
-
-public class LoginRequest
-{
-    public string Username { get; set; }
-    public string Password { get; set; }
 }

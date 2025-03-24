@@ -7,7 +7,7 @@ namespace OWMS.Models
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int ProductId { get; set; }
+        public int Id { get; set; }
 
         [Required]
         [MaxLength(200)]
@@ -21,10 +21,13 @@ namespace OWMS.Models
         [MaxLength(500)]
         public string? PhotoUrl { get; set; }
 
+        [NotMapped]
+        public IFormFile? ImageFile { get; set; }
+
         [Required]
         [ForeignKey("Counter")]
-        public int CounterId { get; set; } 
-        public Counter Counter { get; set; } = null!; 
+        public int CounterId { get; set; }
+        public Counter Counter { get; set; } = null!;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

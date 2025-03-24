@@ -5,7 +5,8 @@ namespace OWMS.Models
 {
     public enum UserRole
     {
-        Admin
+        Admin,
+        User
     }
 
     public class User

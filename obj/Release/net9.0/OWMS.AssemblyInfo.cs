@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("OWMS")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d13cae203dc2b504d84883e0dd20f2e2727101fb")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+64cb8324db559abefd4f9818fc8d71e0df4cbcdd")]
 [assembly: System.Reflection.AssemblyProductAttribute("OWMS")]
 [assembly: System.Reflection.AssemblyTitleAttribute("OWMS")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
