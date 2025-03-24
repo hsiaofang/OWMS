@@ -1,76 +1,76 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using OWMS.Data;
-using OWMS.Models;
+//using Microsoft.AspNetCore.Mvc;
+//using Microsoft.EntityFrameworkCore;
+//using OWMS.Data;
+//using OWMS.Models;
 
-namespace OWMS.Controllers
-{
-    [Route("api/[controller]")]
-    [ApiController]
-    public class VendorController : ControllerBase
-    {
-        private readonly ApplicationDbContext _context;
+//namespace OWMS.Controllers
+//{
+//    [Route("api/vendor")]
+//    [ApiController]
+//    public class VendorController : ControllerBase
+//    {
+//        private readonly ApplicationDbContext _context;
 
-        public VendorController(ApplicationDbContext context)
-        {
-            _context = context;
-        }
+//        public VendorController(ApplicationDbContext context)
+//        {
+//            _context = context;
+//        }
+        
+//        [HttpGet]
+//        public async Task<ActionResult<IEnumerable<Vendor>>> GetVendors()
+//        {
+//            return await _context.Vendors.ToListAsync();
+//        }
 
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Vendor>>> GetVendors()
-        {
-            return await _context.Vendors.ToListAsync();
-        }
+//        [HttpPost]
+//        public async Task<ActionResult<Vendor>> PostVendor(Vendor vendor)
+//        {
+//            _context.Vendors.Add(vendor);
+//            await _context.SaveChangesAsync();
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Vendor>> GetVendor(int id)
-        {
-            var vendor = await _context.Vendors.FindAsync(id);
+//            //return CreatedAtAction(nameof(GetVendor), new { id = vendor.VendorId }, vendor);
+//        }
 
-            if (vendor == null)
-            {
-                return NotFound();
-            }
+//        [HttpDelete("{id}")]
+//        public async Task<IActionResult> DeleteVendor(int id)
+//        {
+//            var vendor = await _context.Vendors.FindAsync(id);
+//            if (vendor == null)
+//            {
+//                return NotFound();
+//            }
 
-            return vendor;
-        }
+//            _context.Vendors.Remove(vendor);
+//            await _context.SaveChangesAsync();
 
-        [HttpPost]
-        public async Task<ActionResult<Vendor>> PostVendor(Vendor vendor)
-        {
-            _context.Vendors.Add(vendor);
-            await _context.SaveChangesAsync();
+//            return NoContent();
+//        }
 
-            return CreatedAtAction(nameof(GetVendor), new { id = vendor.VendorId }, vendor);
-        }
 
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutVendor(int id, Vendor vendor)
-        {
-            if (id != vendor.VendorId)
-            {
-                return BadRequest();
-            }
+//        // 搜尋廠商，根據廠商名稱、聯絡人
+//        [HttpGet("search")]
+//        public async Task<ActionResult<IEnumerable<Vendor>>> SearchVendors(
+//            [FromQuery] string vendorName,
+//            [FromQuery] string contact)
+//        {
+//            IQueryable<Vendor> query = _context.Vendors;
 
-            _context.Entry(vendor).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
+//            if (!string.IsNullOrEmpty(vendorName))
+//            {
+//                query = query.Where(v => v.VendorName.Contains(vendorName));
+//            }
 
-            return NoContent();
-        }
+//            if (!string.IsNullOrEmpty(contact))
+//            {
+//                query = query.Where(v => v.Contact.Contains(contactPerson));
+//            }
 
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteVendor(int id)
-        {
-            var vendor = await _context.Vendors.FindAsync(id);
-            if (vendor == null)
-            {
-                return NotFound();
-            }
+//            var vendors = await query.ToListAsync();
 
-            _context.Vendors.Remove(vendor);
-            await _context.SaveChangesAsync();
+//            return Ok(vendors);
+//        }
 
-            return NoContent();
-        }
-    }
-}
+
+
+//    }
+//}

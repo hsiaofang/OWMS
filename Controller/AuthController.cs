@@ -6,6 +6,8 @@ using OWMS.Models;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using BCrypt.Net;
+using OWMS.Requests;
 
 [Route("api/auth")]
 [ApiController]
@@ -23,8 +25,13 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
+        if (request == null || string.IsNullOrEmpty(request.Username) || string.IsNullOrEmpty(request.Password))
+        {
+            return BadRequest(new { message = "使用者名稱和密碼不得為空！" });
+        }
+
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password))
+        if (user == null || string.IsNullOrEmpty(user.Password) || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password))
         {
             return Unauthorized(new { message = "帳號或密碼錯誤！" });
         }
@@ -35,7 +42,18 @@ public class AuthController : ControllerBase
 
     private string GenerateJwtToken(User user)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JwtSettings:Key"]));
+        if (user == null)
+        {
+            throw new ArgumentNullException(nameof(user), "User cannot be null.");
+        }
+
+        var keyString = _config["JwtSettings:Key"];
+        if (string.IsNullOrEmpty(keyString))
+        {
+            throw new Exception("JWT 密鑰未設定");
+        }
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyString));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var claims = new[]
         {
@@ -56,8 +74,4 @@ public class AuthController : ControllerBase
     }
 }
 
-public class LoginRequest
-{
-    public string Username { get; set; }
-    public string Password { get; set; }
-}
+
