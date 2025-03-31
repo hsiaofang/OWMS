@@ -5,12 +5,14 @@ using Microsoft.AspNetCore.Http;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using QRCoder;
+using System;
 
 namespace OWMS.Controllers
 {
     [Route("api/products")]
     [ApiController]
-    public class ProductController : Controller
+    public class ProductController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
 
@@ -19,23 +21,27 @@ namespace OWMS.Controllers
             _context = context;
         }
 
-        public async Task<IActionResult> Index()
+        [HttpGet]
+        public async Task<IActionResult> GetAllProducts()
         {
             var products = await _context.Products.ToListAsync();
-            return View(products);
+            return Ok(products);
         }
 
-        // 顯示新增頁面
-        [HttpGet]
-        public IActionResult Create()
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetProductById(int id)
         {
-            return View();
+            var product = await _context.Products.FindAsync(id);
+            if (product == null)
+            {
+                return NotFound();
+            }
+            return Ok(product);
         }
 
-        // 新增
-        [HttpPost]
+        [HttpPost("create")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Product product)
+        public async Task<IActionResult> CreateProduct([FromBody] Product product)
         {
             if (ModelState.IsValid)
             {
@@ -49,38 +55,24 @@ namespace OWMS.Controllers
                     product.PhotoUrl = $"/images/{product.ImageFile.FileName}";
                 }
 
-                product.QRCode = GenerateQRCode(product.ProductName);
-
+                product.QRCode = GenerateQRCodeBase64(product.ProductName);
                 product.CreatedAt = DateTime.UtcNow;
 
                 _context.Add(product);
                 await _context.SaveChangesAsync();
 
-                return RedirectToAction(nameof(Index));
+                return CreatedAtAction(nameof(GetProductById), new { id = product.Id }, product);
             }
-            return View(product);
+            return BadRequest(ModelState);
         }
 
-        // 顯示編輯頁面
-        [HttpGet]
-        public async Task<IActionResult> Edit(int id)
-        {
-            var product = await _context.Products.FindAsync(id);
-            if (product == null)
-            {
-                return NotFound();
-            }
-            return View(product);
-        }
-
-        // 編輯
-        [HttpPost]
+        [HttpPut("edit/{id}")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, Product product)
+        public async Task<IActionResult> EditProduct(int id, [FromBody] Product product)
         {
             if (id != product.Id)
             {
-                return NotFound();
+                return BadRequest("Product ID mismatch");
             }
 
             if (ModelState.IsValid)
@@ -95,51 +87,64 @@ namespace OWMS.Controllers
                     product.PhotoUrl = $"/images/{product.ImageFile.FileName}";
                 }
 
-                product.QRCode = GenerateQRCode(product.ProductName);
-
+                product.QRCode = GenerateQRCodeBase64(product.ProductName);
                 _context.Update(product);
                 await _context.SaveChangesAsync();
 
-                return RedirectToAction(nameof(Index));
+                return NoContent();
             }
-            return View(product);
+            return BadRequest(ModelState);
         }
 
-        // 顯示刪除頁面
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("delete/{id}")]
+        public async Task<IActionResult> DeleteProduct(int id)
         {
-            var product = await _context.Products
-                .FirstOrDefaultAsync(m => m.Id == id);
+            var product = await _context.Products.FindAsync(id);
             if (product == null)
             {
                 return NotFound();
             }
 
-            return View(product);
+            _context.Products.Remove(product);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
         }
 
-        // 刪除
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
+        [HttpGet("qrcode/{id}")]
+        public IActionResult GetQRCode(int id)
         {
-            var product = await _context.Products.FindAsync(id);
-            if (product != null)
+            var product = _context.Products.FirstOrDefault(p => p.Id == id);
+
+            if (product == null)
             {
-                _context.Products.Remove(product);
-                await _context.SaveChangesAsync();
+                return NotFound();
             }
-            return RedirectToAction(nameof(Index));
+
+            var qrCodeData = GenerateQRCodeBase64(product.ProductName);
+            return Ok(new { qrCodeBase64 = qrCodeData });
         }
 
-        private bool ProductExists(int id)
+        private string GenerateQRCodeBase64(string data)
         {
-            return _context.Products.Any(e => e.Id == id);
+            using (var qrGenerator = new QRCodeGenerator())
+            {
+                var qrCodeData = qrGenerator.CreateQrCode(data, QRCodeGenerator.ECCLevel.Q);
+                using (var qrCode = new QRCode(qrCodeData))
+                {
+                    using (var ms = new MemoryStream())
+                    {
+                        qrCode.GetGraphic(20).Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                        byte[] byteArray = ms.ToArray();
+                        return Convert.ToBase64String(byteArray);
+                    }
+                }
+            }
         }
 
-        private string GenerateQRCode(string data)
+        private Product GetProductById(int id)
         {
-            return $"QRCode_for_{data}";
+            return _context.Products.FirstOrDefault(p => p.Id == id);
         }
     }
 }
