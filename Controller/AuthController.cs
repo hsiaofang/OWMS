@@ -57,7 +57,7 @@ public class AuthController : ControllerBase
             throw new Exception("JWT �K�_���]�w");
         }
 
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JwtSettings:Key"]));
         var claims = new[]
         {
             new Claim(ClaimTypes.Name, user.Username),

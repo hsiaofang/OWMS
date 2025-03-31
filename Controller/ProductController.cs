@@ -1,16 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
 using OWMS.Data;
 using OWMS.Models;
-using Microsoft.AspNetCore.Http;
-using System.IO;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using QRCoder;
+using System.Drawing.Imaging;
 
 namespace OWMS.Controllers
 {
     [Route("api/products")]
     [ApiController]
-    public class ProductController : Controller
+    public class ProductController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
 
@@ -19,127 +18,126 @@ namespace OWMS.Controllers
             _context = context;
         }
 
-        public async Task<IActionResult> Index()
+        [HttpGet]
+        public async Task<IActionResult> GetAllProducts()
         {
             var products = await _context.Products.ToListAsync();
-            return View(products);
+            return Ok(products);
         }
 
-        // 顯示新增頁面
-        [HttpGet]
-        public IActionResult Create()
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetProductById(int id)
         {
-            return View();
+            var product = await _context.Products.FindAsync(id);
+            if (product == null)
+            {
+                return NotFound();
+            }
+            return Ok(product);
         }
 
-        // 新增
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Product product)
+        [HttpPost("create")]
+        public async Task<IActionResult> CreateProduct([FromBody] Product product)
         {
             if (ModelState.IsValid)
             {
                 if (product.ImageFile != null && product.ImageFile.Length > 0)
                 {
-                    var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", product.ImageFile.FileName);
+                    var fileName = Guid.NewGuid().ToString() + Path.GetExtension(product.ImageFile.FileName);
+                    var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", fileName);
                     using (var stream = new FileStream(filePath, FileMode.Create))
                     {
                         await product.ImageFile.CopyToAsync(stream);
                     }
-                    product.PhotoUrl = $"/images/{product.ImageFile.FileName}";
+                    product.PhotoUrl = $"/images/{fileName}";
                 }
-
-                product.QRCode = GenerateQRCode(product.ProductName);
-
+                product.QRCode = GenerateQRCodeBase64($"https://yourdomain.com/products/{product.Id}");
                 product.CreatedAt = DateTime.UtcNow;
 
                 _context.Add(product);
                 await _context.SaveChangesAsync();
 
-                return RedirectToAction(nameof(Index));
+                return CreatedAtAction(nameof(GetProductById), new { id = product.Id }, product);
             }
-            return View(product);
+            return BadRequest(ModelState);
         }
 
-        // 顯示編輯頁面
-        [HttpGet]
-        public async Task<IActionResult> Edit(int id)
-        {
-            var product = await _context.Products.FindAsync(id);
-            if (product == null)
-            {
-                return NotFound();
-            }
-            return View(product);
-        }
-
-        // 編輯
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, Product product)
+        [HttpPut("edit/{id}")]
+        public async Task<IActionResult> EditProduct(int id, [FromBody] Product product)
         {
             if (id != product.Id)
             {
-                return NotFound();
+                return BadRequest("Product ID mismatch");
             }
 
             if (ModelState.IsValid)
             {
+                // Handle image file upload
                 if (product.ImageFile != null && product.ImageFile.Length > 0)
                 {
-                    var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", product.ImageFile.FileName);
+                    var fileName = Guid.NewGuid().ToString() + Path.GetExtension(product.ImageFile.FileName);
+                    var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", fileName);
                     using (var stream = new FileStream(filePath, FileMode.Create))
                     {
                         await product.ImageFile.CopyToAsync(stream);
                     }
-                    product.PhotoUrl = $"/images/{product.ImageFile.FileName}";
+                    product.PhotoUrl = $"/images/{fileName}";
                 }
 
-                product.QRCode = GenerateQRCode(product.ProductName);
-
+                // Generate QR Code based on the product's ID or a meaningful string
+                product.QRCode = GenerateQRCodeBase64($"https://yourdomain.com/products/{product.Id}");
                 _context.Update(product);
                 await _context.SaveChangesAsync();
 
-                return RedirectToAction(nameof(Index));
+                return NoContent();
             }
-            return View(product);
+            return BadRequest(ModelState);
         }
 
-        // 顯示刪除頁面
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("delete/{id}")]
+        public async Task<IActionResult> DeleteProduct(int id)
         {
-            var product = await _context.Products
-                .FirstOrDefaultAsync(m => m.Id == id);
+            var product = await _context.Products.FindAsync(id);
             if (product == null)
             {
                 return NotFound();
             }
 
-            return View(product);
+            _context.Products.Remove(product);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
         }
 
-        // 刪除
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
+        [HttpGet("qrcode/{id}")]
+        public IActionResult GetQRCode(int id)
         {
-            var product = await _context.Products.FindAsync(id);
-            if (product != null)
+            var product = _context.Products.FirstOrDefault(p => p.Id == id);
+
+            if (product == null)
             {
-                _context.Products.Remove(product);
-                await _context.SaveChangesAsync();
+                return NotFound();
             }
-            return RedirectToAction(nameof(Index));
+
+            var qrCodeData = GenerateQRCodeBase64($"https://localhost:5000/products/{product.Id}");
+            return Ok(new { qrCodeBase64 = qrCodeData });
         }
 
-        private bool ProductExists(int id)
+        private string GenerateQRCodeBase64(string data)
         {
-            return _context.Products.Any(e => e.Id == id);
-        }
-
-        private string GenerateQRCode(string data)
-        {
-            return $"QRCode_for_{data}";
+            using (var qrGenerator = new QRCodeGenerator())
+            {
+                var qrCodeData = qrGenerator.CreateQrCode(data, QRCodeGenerator.ECCLevel.Q);
+                using (var qrCode = new QRCode(qrCodeData))
+                {
+                    using (var ms = new MemoryStream())
+                    {
+                        qrCode.GetGraphic(20).Save(ms, ImageFormat.Png);
+                        byte[] byteArray = ms.ToArray();
+                        return Convert.ToBase64String(byteArray);
+                    }
+                }
+            }
         }
     }
 }
