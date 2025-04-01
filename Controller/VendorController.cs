@@ -1,76 +1,63 @@
-//using Microsoft.AspNetCore.Mvc;
-//using Microsoft.EntityFrameworkCore;
-//using OWMS.Data;
-//using OWMS.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using OWMS.Data;
+using OWMS.Models;
 
-//namespace OWMS.Controllers
-//{
-//    [Route("api/vendor")]
-//    [ApiController]
-//    public class VendorController : ControllerBase
-//    {
-//        private readonly ApplicationDbContext _context;
+namespace OWMS.Controllers
+{
+    [Route("api/vendor")]
+    [ApiController]
+    public class VendorController : ControllerBase
+    {
+        private readonly ApplicationDbContext _context;
 
-//        public VendorController(ApplicationDbContext context)
-//        {
-//            _context = context;
-//        }
-        
-//        [HttpGet]
-//        public async Task<ActionResult<IEnumerable<Vendor>>> GetVendors()
-//        {
-//            return await _context.Vendors.ToListAsync();
-//        }
+        public VendorController(ApplicationDbContext context)
+        {
+            _context = context;
+        }
 
-//        [HttpPost]
-//        public async Task<ActionResult<Vendor>> PostVendor(Vendor vendor)
-//        {
-//            _context.Vendors.Add(vendor);
-//            await _context.SaveChangesAsync();
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Vendor>>> GetAllVendors()
+        {
+            return await _context.Vendors.ToListAsync();
+        }
+        // Á∑®ËºØ
+        [HttpPut("{id}")]
+        public async Task<IActionResult> EditVendor(int id, [FromBody] Vendor updatedVendor)
+        {
+            var vendor = await _context.Vendors.FindAsync(id);
 
-//            //return CreatedAtAction(nameof(GetVendor), new { id = vendor.VendorId }, vendor);
-//        }
+            vendor.Name = updatedVendor.Name;
+            vendor.Type = updatedVendor.Type;
+            vendor.Notes = updatedVendor.Notes;
 
-//        [HttpDelete("{id}")]
-//        public async Task<IActionResult> DeleteVendor(int id)
-//        {
-//            var vendor = await _context.Vendors.FindAsync(id);
-//            if (vendor == null)
-//            {
-//                return NotFound();
-//            }
+            _context.Vendors.Update(vendor);
+            await _context.SaveChangesAsync();
 
-//            _context.Vendors.Remove(vendor);
-//            await _context.SaveChangesAsync();
+            return Ok(vendor);
+        }
 
-//            return NoContent();
-//        }
+        // ÊêúÂ∞ã
+        [HttpGet("search")]
+        public async Task<ActionResult<IEnumerable<Vendor>>> SearchVendors(
+            [FromQuery] string vendorName,
+            [FromQuery] string contact)
+        {
+            IQueryable<Vendor> query = _context.Vendors;
 
+            if (!string.IsNullOrEmpty(vendorName))
+            {
+                query = query.Where(v => v.Name.Contains(vendorName));
+            }
 
-//        // ∑j¥Mºt∞”°AÆ⁄æ⁄ºt∞”¶W∫Ÿ°B¡pµ∏§H
-//        [HttpGet("search")]
-//        public async Task<ActionResult<IEnumerable<Vendor>>> SearchVendors(
-//            [FromQuery] string vendorName,
-//            [FromQuery] string contact)
-//        {
-//            IQueryable<Vendor> query = _context.Vendors;
+            if (!string.IsNullOrEmpty(contact))
+            {
+                query = query.Where(v => v.Account.Contains(contact));
+            }
 
-//            if (!string.IsNullOrEmpty(vendorName))
-//            {
-//                query = query.Where(v => v.VendorName.Contains(vendorName));
-//            }
+            var vendors = await query.ToListAsync();
+            return Ok(vendors);
+        }
+    }
 
-//            if (!string.IsNullOrEmpty(contact))
-//            {
-//                query = query.Where(v => v.Contact.Contains(contactPerson));
-//            }
-
-//            var vendors = await query.ToListAsync();
-
-//            return Ok(vendors);
-//        }
-
-
-
-//    }
-//}
+}

@@ -1,13 +1,18 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using OWMS.Data;
-using OWMS.Models;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.IdentityModel.JsonWebTokens;
+using System.Threading.Tasks;
+
 using BCrypt.Net;
+using OWMS.Data;
+using OWMS.Models;
 using OWMS.Requests;
+
+using System;
 
 [Route("api/auth")]
 [ApiController]
@@ -27,13 +32,13 @@ public class AuthController : ControllerBase
     {
         if (request == null || string.IsNullOrEmpty(request.Username) || string.IsNullOrEmpty(request.Password))
         {
-            return BadRequest(new { message = "¨Ï¥ÎªÌ¦WºÙ©M±K½X¤£±o¬°ªÅ¡I" });
+            return BadRequest("è«‹è¼¸å…¥å¸³è™Ÿå’Œå¯†ç¢¼");
         }
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
-        if (user == null || string.IsNullOrEmpty(user.Password) || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password))
+        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password))
         {
-            return Unauthorized(new { message = "±b¸¹©Î±K½X¿ù»~¡I" });
+            return Unauthorized("å¸³è™Ÿæˆ–å¯†ç¢¼éŒ¯èª¤");
         }
 
         var token = GenerateJwtToken(user);
@@ -42,36 +47,29 @@ public class AuthController : ControllerBase
 
     private string GenerateJwtToken(User user)
     {
-        if (user == null)
-        {
-            throw new ArgumentNullException(nameof(user), "User cannot be null.");
-        }
+        var jwtSettings = _config.GetSection("Jwt");
 
-        var keyString = _config["JwtSettings:Key"];
-        if (string.IsNullOrEmpty(keyString))
-        {
-            throw new Exception("JWT ±KÆ_¥¼³]©w");
-        }
+        var secretKey = jwtSettings["Secret"];
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey!));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+        var expiresInMinutes = Int32.Parse(jwtSettings["ExpiresInMinutes"]!);
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyString));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var claims = new[]
+        var tokenDescriptor = new SecurityTokenDescriptor
         {
-            new Claim(ClaimTypes.Name, user.Username),
-            new Claim(ClaimTypes.Role, user.Role.ToString()),
-            new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString())
+            Subject = new ClaimsIdentity(
+            [
+                new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
+                new Claim(JwtRegisteredClaimNames.Email, user.Username),
+            ]),
+            Expires = DateTime.UtcNow.AddMinutes(expiresInMinutes),
+            SigningCredentials = credentials,
+            Issuer = jwtSettings["Issuer"],
+            Audience = jwtSettings["Audience"],
         };
 
-        var token = new JwtSecurityToken(
-            issuer: _config["JwtSettings:Issuer"],
-            audience: _config["JwtSettings:Audience"],
-            claims: claims,
-            expires: DateTime.UtcNow.AddHours(1),
-            signingCredentials: creds
-        );
+        var handler = new JsonWebTokenHandler();
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        string token = handler.CreateToken(tokenDescriptor);
+        return token;
     }
 }
-
-

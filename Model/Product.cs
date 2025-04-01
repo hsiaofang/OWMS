@@ -14,6 +14,9 @@ namespace OWMS.Models
         public string ProductName { get; set; } = "";
 
         [Required]
+        public decimal Price { get; set; }
+
+        [Required]
         [ForeignKey("Vendor")]
         public int VendorId { get; set; }
         public Vendor Vendor { get; set; } = null!;

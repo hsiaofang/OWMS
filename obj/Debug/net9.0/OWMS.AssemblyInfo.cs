@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("OWMS")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+774f5ec807787f3ee1b54c4a10fdf95081545ffa")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a0ab546fb660f55b64241136bde15599f52a3470")]
 [assembly: System.Reflection.AssemblyProductAttribute("OWMS")]
 [assembly: System.Reflection.AssemblyTitleAttribute("OWMS")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
