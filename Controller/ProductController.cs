@@ -7,6 +7,7 @@ using System.IO;
 using OWMS.Data;
 using OWMS.Models;
 using QRCoder;
+using System.Drawing.Imaging;
 
 namespace OWMS.Controllers
 {
@@ -22,11 +23,41 @@ namespace OWMS.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAllProducts()
+        public async Task<IActionResult> GetAllProducts(
+            [FromQuery] string? name,
+            [FromQuery] string? vendor,
+            [FromQuery] string? counter,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
         {
-            var products = await _context.Products.ToListAsync();
-            return Ok(products);
+            var products = _context.Products
+                .Include(p => p.Vendor)
+                .Include(p => p.Counter)
+                .AsQueryable();
+            if (!string.IsNullOrEmpty(name))
+            {
+                products = products.Where(p => p.ProductName.Contains(name));
+            }
+            // 搜尋廠商
+            if (!string.IsNullOrEmpty(vendor))
+            {
+                products = products.Where(p => p.Vendor != null && p.Vendor.Name.Contains(vendor));
+            }
+            // 搜尋櫃號
+            if (!string.IsNullOrEmpty(counter))
+            {
+                products = products.Where(p => p.Counter != null && p.Vendor.Name.Contains(counter));
+            }
+            int totalProducts = await products.CountAsync();
+            // 分頁
+            var pagedProducts = await products
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return Ok(new { totalProducts, products = pagedProducts });
         }
+
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetProductById(int id)
@@ -46,16 +77,13 @@ namespace OWMS.Controllers
         {
             if (ModelState.IsValid)
             {
-                // 处理图片上传
+                // 上傳圖片
                 if (product.ImageFile != null && product.ImageFile.Length > 0)
                 {
                     product.PhotoUrl = await SaveProductImage(product.ImageFile);
                 }
-
-                // 生成二维码
                 product.QRCode = GenerateQRCode(product.ProductName);
                 product.CreatedAt = DateTime.UtcNow;
-
                 _context.Add(product);
                 await _context.SaveChangesAsync();
 
@@ -73,31 +101,22 @@ namespace OWMS.Controllers
                                         .Include(p => p.Vendor)
                                         .Include(p => p.Counter)
                                         .FirstOrDefaultAsync(p => p.Id == id);
-
             if (product == null)
             {
                 return NotFound();
             }
-
-            // 更新产品信息
             product.ProductName = updatedProduct.ProductName;
             product.Price = updatedProduct.Price;
             product.Notes = updatedProduct.Notes;
-
-            // 更新关联的 Vendor 和 Counter
             product.VendorId = updatedProduct.VendorId;
             product.CounterId = updatedProduct.CounterId;
 
-            // 生成新的二维码
-            product.QRCode = GenerateQRCode(updatedProduct.ProductName);
+            // product.QRCode = GenerateQRCode(updatedProduct.ProductName);
 
-            // 如果有新的图片，处理图片上传
-            if (updatedProduct.ImageFile != null && updatedProduct.ImageFile.Length > 0)
-            {
-                product.PhotoUrl = await SaveProductImage(updatedProduct.ImageFile);
-            }
-
-            // 更新产品信息
+            // if (updatedProduct.ImageFile != null && updatedProduct.ImageFile.Length > 0)
+            // {
+            //     product.PhotoUrl = await SaveProductImage(updatedProduct.ImageFile);
+            // }
             _context.Products.Update(product);
             await _context.SaveChangesAsync();
 
@@ -108,17 +127,10 @@ namespace OWMS.Controllers
         [HttpDelete("delete/{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
         {
-            // 查找產品
             var product = await _context.Products.FindAsync(id);
-
-
-            // 刪除產品
             _context.Products.Remove(product);
-
-            // 保存更改
             await _context.SaveChangesAsync();
 
-            // 返回204 No Content，表示成功刪除
             return NoContent();
         }
 
@@ -135,7 +147,6 @@ namespace OWMS.Controllers
                 await imageFile.CopyToAsync(file);
             }
 
-            // 返回文件的URL
             return $"/images/{newFileName}";
         }
 
@@ -144,15 +155,11 @@ namespace OWMS.Controllers
             using (var qrGenerator = new QRCodeGenerator())
             {
                 var qrCodeData = qrGenerator.CreateQrCode(data, QRCodeGenerator.ECCLevel.Q);
-                using (var qrCode = new QRCode(qrCodeData))
-                {
-                    using (var ms = new MemoryStream())
-                    {
-                        qrCode.GetGraphic(20).Save(ms, ImageFormat.Png);
 
-                        byte[] byteArray = ms.ToArray();
-                        return Convert.ToBase64String(byteArray);
-                    }
+                using (var qrCode = new PngByteQRCode(qrCodeData))
+                {
+                    byte[] byteArray = qrCode.GetGraphic(20);
+                    return Convert.ToBase64String(byteArray);
                 }
             }
         }
